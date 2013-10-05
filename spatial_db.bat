@@ -1,14 +1,14 @@
 REM -Usage: spatial_db my_database_name
 
 SET db=%1
-SET style=P:/osm/rlis2osm_verify/7_county/test.style
-SET osm_dir=P:/osm/rlis2osm_verify/postgis/output/osmfiles/
-SET shape_dir=P:/osm/rlis2osm_verify/postgis/output/shapefiles/
+SET style=P:\osm\rlis2osm_verify\7_county\test.style
+SET osm_dir=P:\osm\rlis2osm_verify\postgis\output\osmfiles\
+SET shape_dir=P:\osm\rlis2osm_verify\postgis\output\shapefiles\
 
 REM -filter Tri-County region osm files for only highways
-call osmosis --rx G:/PUBLIC/OpenStreetMap/data/osm/multnomah.osm ^
---rx G:/PUBLIC/OpenStreetMap/data/osm/washington.osm ^
---rx G:/PUBLIC/OpenStreetMap/data/osm/clackamas.osm ^
+call osmosis --rx G:\PUBLIC\OpenStreetMap\data\osm\multnomah.osm ^
+--rx G:\PUBLIC\OpenStreetMap\data\osm\washington.osm ^
+--rx G:\PUBLIC\OpenStreetMap\data\osm\clackamas.osm ^
 --m --m ^
 --tf accept-ways highway=* ^
 --tf reject-relations ^
@@ -29,7 +29,4 @@ call ogr2ogr -t_srs EPSG:2913 %shape_dir%osm_streets_2913.shp %shape_dir%osm_str
 
 REM -cleanup
 call psql -U postgres -c "DROP DATABASE %db%;"
-del %shape_dir%osm_streets.db
-del %shape_dir%osm_streets.prj
-del %shape_dir%osm_streets.shp
-del %shape_dir%osm_streets.shx
+del %shape_dir%osm_streets.*
