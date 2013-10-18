@@ -1,5 +1,10 @@
-import os, sys, arcpy
+import os, sys, codecs, arcpy
 from arcpy import env
+import fiona
+from shapely.geometry import shape, mapping
+import shapely_test
+#set standard output to print utf-8 characters
+sys.stdout = codecs.getwriter('utf-8')(sys.stdout)
 
 
 """
@@ -8,16 +13,23 @@ arcpy scripts are so ugly :(
 TODO: migrate arcpy functions to use shapely library
 
 """
+in_rlis = 'P:/osm/rlis2osm_verify/7_county/scripts/test_data/rlis_trails.shp'
+in_osm = 'P:/osm/rlis2osm_verify/7_county/scripts/test_data/osm_trails.shp'
+out_file = 'test_diff.shp'
+method = 'trails'
+out_dir = 'P:/osm/rlis2osm_verify/7_county/scripts/test_data/output/'
 
-#in_dir = 'P:/osm/rlis2osm_verify/7_county/scripts/test_data/'
-#out_dir = 'P:/osm/rlis2osm_verify/7_county/scripts/test_data/output/'
-out_dir = 'P:/osm/rlis2osm_verify/postgis/output/shapefiles/'
 
+"""
 #sys.argv
 in_rlis = sys.argv[1]
 in_osm = sys.argv[2]
 out_file = sys.argv[3]
 method = sys.argv[4]
+out_dir = 'P:/osm/rlis2osm_verify/postgis/output/shapefiles/'
+"""
+
+
 
 print in_rlis
 print in_osm
@@ -54,7 +66,26 @@ elif method == 'streets':
 print "dissolve"
 arcpy.Dissolve_management(in_rlis, temp_rlis_dissolve, dissolve_fields, '', "SINGLE_PART", "DISSOLVE_LINES")
 print "buffer"
-arcpy.Buffer_analysis(in_osm, temp_osm_buffer, '30 feet' , '', '', 'ALL', '')
+
+
+"""
+------------------------------------
+Replace buffer_analysis with shapely
+------------------------------------
+"""
+#arcpy.Buffer_analysis(in_osm, temp_osm_buffer, '30 feet' , '', '', 'ALL', '')
+shapely_test.buffer(in_osm, temp_osm_buffer, 30, True)
+
+
+ 
+  
+
+
+
+
+
+
+
 
 desc = arcpy.Describe(in_osm)
 extent = desc.extent
