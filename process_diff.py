@@ -2,7 +2,7 @@ import os, sys, codecs, arcpy
 from arcpy import env
 import fiona
 from shapely.geometry import shape, mapping
-import shapely_test
+import geo_func
 #set standard output to print utf-8 characters
 sys.stdout = codecs.getwriter('utf-8')(sys.stdout)
 
@@ -74,7 +74,7 @@ Replace buffer_analysis with shapely
 ------------------------------------
 """
 #arcpy.Buffer_analysis(in_osm, temp_osm_buffer, '30 feet' , '', '', 'ALL', '')
-shapely_test.buffer(in_osm, temp_osm_buffer, 30, True)
+geo_func.buffer(in_osm, temp_osm_buffer, 30, True)
 
 
  
