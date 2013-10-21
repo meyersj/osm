@@ -10,21 +10,23 @@ line = '/home/jeff/trimet/shapely/test_data/line.shp'
 test_out = '/home/jeff/trimet/shapely/test_data/test_out.shp'
 
 
-
+"""
 with fiona.open(line, 'r') as input:
 
   schema = input.schema
   crs = input.crs
 
-  print schema
   idx = index.Index()
 
   data = {}
+  
   for f in input:
     geom = shape(f['geometry'])
     fid = f['properties']['fid']
     data[fid] = geom
-    idx.insert(fid, geom.bounds)
+    idx.insert(fid, geom.bounds, geom)
+  
+  
 
 
   for fid in data.keys():
@@ -33,14 +35,14 @@ with fiona.open(line, 'r') as input:
     print intersect 
     geom = data[fid]
     for i in intersect:
-      if data[i].intersects(geom):
-        print 'True ' + str(i)
-      else:
-        print 'False ' + str(i) 
+      if data[i].equals(geom) is False:
+        if data[i].intersects(geom):
+          print 'True ' + str(i)
+        else:
+          print 'False ' + str(i) 
   
-
-#left, bottom, right, top
 """
+#left, bottom, right, top
 one = LineString([(0, 0), (1,1)])
 one_bounds = (0.0, 0.0, 1.0, 1.0)
 two = LineString([(1.5, 0.5),(2.5, 1.5)])
@@ -57,9 +59,6 @@ idx.insert(3, three_bounds, three)
 idx.insert(4, four_bounds, four)
 
 
-for n in idx.intersection(three_bounds, objects=True):
-  print n.area
-"""
-
+idx.delete(3, three_bounds)
 
 

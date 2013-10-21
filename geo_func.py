@@ -1,14 +1,13 @@
-from fiona import open
-from fiona.crs import from_string
+import fiona
 from shapely.geometry import shape, mapping, Point, LineString, Polygon
 from collections import OrderedDict
 from shapely.ops import cascaded_union, linemerge
 import sys, codecs, pprint
-
+from rtree import index
 sys.stdout = codecs.getwriter('utf-8')(sys.stdout)
 
 poly = '/home/jeff/trimet/shapely/test_data/poly.shp'
-line = '/home/jeff/trimet/shapely/test_data/rlis_trails.shp'
+line = '/home/jeff/trimet/shapely/test_data/line.shp'
 test_out = '/home/jeff/trimet/shapely/test_data/test_out.shp'
 
 """
@@ -21,7 +20,7 @@ test_merge = 'P:/osm/rlis2osm_verify/7_county/scripts/test_data/test_merge.shp'
 
 def buffer(toBuffer, outFile, distance, dissolve):
 
-  with open(toBuffer, 'r') as input:
+  with fiona.open(toBuffer, 'r') as input:
     schema = input.schema
     crs = input.crs
     schema['geometry'] = 'Polygon'
@@ -43,32 +42,107 @@ def buffer(toBuffer, outFile, distance, dissolve):
       schema['properties'][k] = 'str:254'
  
  
-  with open(outFile, 'w', 'ESRI Shapefile', crs=crs, schema=schema) as output:
+  with fiona.open(outFile, 'w', 'ESRI Shapefile', crs=crs, schema=schema) as output:
     for geom, prop in buf_features: 
       output.write({'geometry': mapping(geom), 'properties':prop})
 
 
+
+def ifDisjoint(infeature, features):
+  # build index with bounding box of inFeature and features list
+  idx = index.Index()
+  idx.insert(0, inFeature.bounds, inFeature)
+
+  for i, f in enumerate(features):
+    idx.insert(i+1, f.bounds, f)
+
+  # create list of features with bbox that intersect inFeatures bbox
+  # if inFeature is disjoint from features list return True 
+  intersect = list(idx.intersection(inFeature.bounds, objects=True))
+    if len(intersect) > 1:  
+      for n in intersect:
+        if f.equals(n.object) is False and inFeature.intersects(n.object):
+          return False  
+
+  return True
+
+
+
+#TODO not going to compile, adding and removing from list while iterating through it
+def unionIntersecting(features, disjointFeatures, idx):
+
+  if features is False:
+    return disjointFeatures
+
+  for f in features:
+    box_intersects = list(idx.intersects(f.bounds, objects=True))
+
+    for n in box_intersects:
+      if f.equals(n.object) is False and f.intersects(n.object):
+        f = f.union(n.object)
+        idx.delete(n.id, n.bounds)
+        features.pop(n.id)
+        idx.insert(n.id, f.bounds, f)
+        features[n.id] = f
+
+    if ifDisjoint(f, features):
+      disjointFeautures[n.id] = f
+      features.pop(n.id) 
+ 
+  return unionIntersecting(features, disjointFeatures, idx)
+ 
+  
+
+
+
+ 
+
+
+
+
+
+
 def dissolve_lines(toDissolve, outFile, attributes, multiPart):
 
-  with open(toDissolve, 'r') as input:
+  with fiona.open(toDissolve, 'r') as input:
     schema = input.schema
     crs = input.crs
 
     for k, v in schema['properties'].items():
       print k
-
+    
     line_features = []
-    for f in input:
-      line_features.append(( shape(f['geometry']), f['properties'] ))
+    for i, f in enumerate(input):
+      features[i] = (shape(f['geometry']), f['properties'])
 
-    if attributes == []:
-      line_features = linemerge([geom for geom, prop in line_features])
-      print len(line_features.geoms) 
-      print line_features.geom_type
-      if multiPart == True:
-        schema = {'geometry':line_features.geom_type, 'properties':{'fid':'int'}}
-        line_features = [(line_features, {'fid':1})] 
+    if attributes:
+      print "not empty"
+    
+    #no attributes specified, dissolve all features
+    else:
+      #if multiPart is True all features will be dissolve 
+      if multiPart is True:
+        features = linemerge([geom for geom, prop in features.values()])
+        schema = {'geometry':features.geom_type, 'properties':{'fid':'int'}}
+        features = [(features, {'fid':1})] 
+     #if multiPart is False dissolve all features that are not disjoint 
+     elif multiPart is False:
+
+
+       idx = index.Index()
+       for i in features.keys():
+         idx.insert(i, features[i][0].bounds, features[i])  
+
+        
+       
+
+
+
+       #disjoint = ifDisjoint([geom for geom, prop in line_features])
+
       
+
+  """
       else:
         schema = {'geometry':'LineString', 'properties':{'fid':'int'}}
         
@@ -81,9 +155,9 @@ def dissolve_lines(toDissolve, outFile, attributes, multiPart):
         for f in single_lines:
           line_features.append((f, {'fid':count} ))
           count += 1
-
-  """ 
-  with open(outFile, 'w', 'ESRI Shapefile', crs=crs, schema=schema) as output:
+  """
+  """
+  with fiona.open(outFile, 'w', 'ESRI Shapefile', crs=crs, schema=schema) as output:
     for geom, prop in line_features: 
       output.write({'geometry': mapping(geom), 'properties':prop})   
   """
@@ -92,7 +166,7 @@ def test(outFile):
 
   schema = {'geometry':'Point', 'properties':{'id':'str:254'}}
  
-  with open(outFile, 'w', 'ESRI Shapefile', schema, crs) as output:
+  with fiona.open(outFile, 'w', 'ESRI Shapefile', schema, crs) as output:
     output.write({'geometry':  mapping(Point(0.0, 0.0)), 'properties':{'id':'test'}})
   
     print "success"
