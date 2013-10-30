@@ -8,7 +8,7 @@ sys.stdout = codecs.getwriter('utf-8')(sys.stdout)
 
 poly = '/home/jeff/trimet/shapely/test_data/poly.shp'
 line = '/home/jeff/trimet/shapely/test_data/line.shp'
-test_out = '/home/jeff/trimet/shapely/test_data/rlis_trails_dissolve.shp'
+test_out_dir = '/home/jeff/trimet/shapely/test_data/'
 rlis_trails = '/home/jeff/trimet/shapely/test_data/rlis_trails.shp'
 
 
@@ -73,24 +73,21 @@ class geo:
 
     return True
 
-  #unionIntersecting(features, idx, item, count)
-
-  #TODO not going to compile, adding and removing from list while iterating through it
   def __unionIntersecting(self, features, idx, disjointFeatures):
 
-
     if not features:
-      return
+      return disjointFeatures
 
     else:
       index = features.iterkeys().next()
       f = features[index][0]
+      f_prop = features[index][1]
       
       if self.__ifDisjoint(f, [features[i][0] for i in features.keys()]):
         idx.delete(index, features[index][0].bounds)
         disjointFeatures.append(features[index])
         del features[index]
-        self.__unionIntersecting(features, idx, disjointFeatures) 
+        return self.__unionIntersecting(features, idx, disjointFeatures) 
       else:
         intersecting_bounds = list(idx.intersection(f.bounds, objects=True))
         
@@ -105,9 +102,9 @@ class geo:
             del features[n.id]
             idx.delete(n.id, n.object[0].bounds)
             idx.insert(index, f.bounds, f)
-            features[index] = (f, {'fid':index})
+            features[index] = [f, f_prop]
 
-        self.__unionIntersecting(features, idx, disjointFeatures)
+        return self.__unionIntersecting(features, idx, disjointFeatures)
 
   def dissolve_lines(self, toDissolve, outFile, attributes, multiPart):
 
@@ -115,19 +112,47 @@ class geo:
       schema = input.schema
       crs = input.crs
 
-      #TODO parse out attributes
-      #for k, v in schema['properties'].items():
-      #  print k
-      
       features = {}
       for i, f in enumerate(input):
-        features[i] = (shape(f['geometry']), f['properties'])
-
-      if attributes:
-        #TODO write function to group features with same attribute
-        #then split up multi parts if multiPart is False
-        print "not empty"
+        features[i] = [shape(f['geometry']), f['properties']]
       
+      if attributes:
+      #TODO test this if block to make it dissolves features properly by attributes param
+
+        for attr in schema['properties'].keys():
+          if attr not in attributes:
+            del schema['properties'][attr]
+
+        attr_sets = {}
+        for i in features.keys():
+          prop_list = []
+          for key in features[i][1].keys():
+            if key in attributes:
+              prop_list.append(features[i][1][key])
+          
+          attr_sets[tuple(prop_list)] = []
+          features[i].append(tuple(prop_list))
+
+        for i in features.keys():
+          attr_sets[features[i][2]].append(features[i])
+          del features[i][2]
+        
+        disjointFeatures = []
+        for key in attr_sets.keys():
+          for item in attr_sets[key]:
+            idx = index.Index()
+            for i in features.keys():
+              idx.insert(i, features[i][0].bounds, features[i])
+            disjointFeatures_partial = []
+            disjointFeatures = disjointFeatures + self.__unionIntersecting(features, idx, disjointFeatures_partial)
+         
+        for feature in disjointFeatures:
+           for attr in feature[1].keys():
+             if attr not in attributes:
+               del feature[1][attr]
+    
+        dissolveFeatures = disjointFeatures
+
       #no attributes specified, dissolve all features
       else:
         #if multiPart is True all features will be dissolve 
@@ -157,6 +182,7 @@ class geo:
         output.write({'geometry': mapping(geom), 'properties':prop})   
 
 
-my_geo = geo()
-my_geo.dissolve_lines(rlis_trails, test_out, [], False)
+if __name__ == '__main__':
+  my_geo = geo()
+  my_geo.dissolve_lines(rlis_trails, test_out_dir + 'rlis_all_multi_name.shp', ['systemname'], True)
 
