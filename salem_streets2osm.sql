@@ -226,9 +226,11 @@ WHERE salem_osm_sts.gid = subquery.gid;
 --7) update type field with correct osm tag
 UPDATE salem_osm_sts SET highway = 'motorway'
    WHERE type = '1110';
+
 --Add name of street into link
---UPDATE salem_osm_sts SET highway = '*_link'
---   WHERE type = '1120';
+UPDATE salem_osm_sts SET highway = '*_link' --type of link needs to be specified eg: motorway_link, tertiary_link
+   WHERE type = '1120';
+
 UPDATE salem_osm_sts SET highway = 'tertiary_link'
    WHERE type = '1124';
 UPDATE salem_osm_sts SET highway = 'primary'
