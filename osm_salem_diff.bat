@@ -5,11 +5,11 @@ setlocal enabledelayedexpansion
 REM -Usage: spatial_db my_database_name
 
 REM choose default database name instead of taking name as parameter
-SET db=temp_database_11010
+SET db=salem_v2
 
 REM take streets or trails keyword as parameter to affect how osmosis filters
 SET type=%1
-
+echo %time%
 
 SET in_data_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Oct_2013\Salem_Area\Salem\
 SET style_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Oct_2013\Salem_Area\style\
@@ -20,7 +20,7 @@ SET ogr2osm_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\utilities\ogr2osm\
 SET osm_filtered=salem_osm_streets.osm
 SET style=streets.style
 
-
+set start=%time%
 
 echo filtering osm
 call osmosis --rx G:\PUBLIC\OpenStreetMap\data\osm\marion.osm ^
@@ -54,23 +54,28 @@ call shp2pgsql -I -s 2913 %in_data_dir%ctrline.shp ctrline | psql -U postgres -d
 call psql -U postgres -d %db% -f "%util_dir%salem_streets2osm.sql"
 
 
+REM call psql -U postgres -d %db% -f process_diff.sql
+
+echo !start!
+echo %time%
+
 REM -export line table from postgis database to shapefile
-echo exporting osm and rlis streets to shapefile
-call pgsql2shp -k -u postgres -P password -f %shape_dir%osm_streets_2913.shp %db% planet_osm_line
-call pgsql2shp -k -u postgres -P password -f %shape_dir%salem_streets_2913.shp %db% salem_osm_sts
+REM echo exporting osm and rlis streets to shapefile
+REM call pgsql2shp -k -u postgres -P password -f %shape_dir%osm_streets_2913.shp %db% planet_osm_line
+REM call pgsql2shp -k -u postgres -P password -f %shape_dir%salem_streets_2913.shp %db% salem_osm_sts
 
 REM -create diff 
 REM call python process_diff_v2.py %shape_dir%salem_streets_2913.shp %shape_dir%osm_streets_2913.shp salem_streets_diff.shp %shape_dir%
 
 
-echo python %util_dir%ogr2osm\ogr2osm.py
+REM echo python %util_dir%ogr2osm\ogr2osm.py
 
 
 REM TODO ogr2osm.py script to export shapefile diff to osm file
-call python %ogr2osm_dir%ogr2osm.py %shape_dir%salem_streets_diff.shp -o %osm_dir%salem_streets_diff.osm -t translations\salem_streets.py
+REM call python %ogr2osm_dir%ogr2osm.py %shape_dir%salem_streets_diff.shp -o %osm_dir%salem_streets_diff.osm -t translations\salem_streets.py
 
 
 
 
-call psql -U postgres -c "DROP DATABASE %db%;"
+REM call psql -U postgres -c "DROP DATABASE %db%;"
 
