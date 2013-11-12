@@ -1,34 +1,45 @@
+BEGIN;
 
---Works except performance is terrible with the entire road network buffer gets is merged into one polygon
 /*
-CREATE TABLE diff AS
+CREATE VIEW osm_buffer AS
 (
-   SELECT salem.*, ST_Difference(salem.geom, buffer.geom) AS new_geom
-   FROM 
-      salem_osm_sts AS salem, (SELECT (ST_Dump(merge_buffer.geom)).geom AS geom
-                               FROM (SELECT ST_Union(ST_Buffer(osm.way, 30)) AS geom
-                                     FROM planet_osm_line AS osm) AS merge_buffer) AS buffer
-   WHERE ST_Intersects(salem.geom, buffer.geom)
-); 
-
-CREATE TABLE contain AS
-(
-   SELECT salem.*
-   FROM salem_osm_sts, (SELECT ST_Buffer(osm.way) AS geom
-                        FROM planet_osm_line AS osm) AS buffer
-   WHERE ST_Contains(buffer.geom, salem.geom)
+   SELECT ST_Buffer(planet_osm_line.way, 30) AS geom
+   FROM planet_osm_line
 );
 
+CREATE VIEW osm_buffer_union AS
+(
+   SELECT ST_Union(osm_buffer.geom) AS geom
+   FROM osm_buffer
+);
 
+CREATE VIEW osm_buffer_dump AS
+(
+   SELECT (ST_Dump(osm_buffer_union.geom)).geom AS geom
+   FROM osm_buffer_union
+);
 */
-DROP TABLE IF EXISTS contain;
 
-
-
-
-CREATE TABLE contain AS
+CREATE TABLE salem_diff AS
 (
-   SELECT test_line.*
-   FROM test_line, test_poly
-   WHERE ST_Contains(test_poly.geom, test_line.geom)
+   SELECT salem_osm_sts.*, ST_Difference(salem_osm_sts.geom, osm_buffer_dump.geom) AS new_geom
+   FROM salem_osm_sts, osm_buffer_dump
+   WHERE salem_osm_sts.gid NOT IN (SELECT salem_osm_sts.gid
+                                   FROM salem_osm_sts, osm_buffer
+								   WHERE ST_Contains(osm_buffer.geom, salem_osm_sts.geom))
+   AND ST_Intersects(salem_osm_sts.geom, osm_buffer_dump.geom)
+   UNION
+   SELECT salem_osm_sts.*, salem_osm_sts.geom AS new_geom
+   FROM salem_osm_sts
+   WHERE salem_osm_sts.gid NOT IN (SELECT salem_osm_sts.gid
+                                   FROM salem_osm_sts, osm_buffer
+							       WHERE ST_Intersects(salem_osm_sts.geom, osm_buffer.geom))
 );
+   
+--DROP VIEW osm_buffer;
+--DROP VIEW osm_buffer_union;
+--DROP VIEW osm_buffer_dump;
+
+COMMIT;
+
+
