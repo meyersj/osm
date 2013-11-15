@@ -46,7 +46,7 @@ IF %type%==streets (
   --rx G:\PUBLIC\OpenStreetMap\data\osm\clackamas.osm ^
   --m --m ^
   --tf accept-ways highway=* ^
-  --tf reject-ways highway=path,footway,pedestrian,steps,bridleway ^
+  --tf reject-ways highway=construction,path,footway,pedestrian,steps,bridleway ^
   --tf reject-relations ^
   --un ^
   --wx %osm_dir%!osm_filtered!

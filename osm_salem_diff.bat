@@ -18,7 +18,7 @@ call osmosis --rx G:\PUBLIC\OpenStreetMap\data\osm\marion.osm ^
 --rx G:\PUBLIC\OpenStreetMap\data\osm\polk.osm ^
 --m ^
 --tf accept-ways highway=* ^
---tf reject-ways highway=path,footway,pedestrian,steps,bridleway ^
+--tf reject-ways highway=construction,path,footway,pedestrian,steps,bridleway ^
 --tf reject-relations ^
 --un ^
 --wx %osm_dir%!osm_filtered!
