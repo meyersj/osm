@@ -254,4 +254,11 @@ UPDATE salem_osm_sts SET highway = 'service', service = 'driveway'
 UPDATE salem_osm_sts SET highway = 'residential'
    WHERE type = '1900';
 
+
+--8) set zipcodes with '0' to NULL
+UPDATE salem_osm_sts SET lzip = NULL
+  WHERE lzip = '0';
+UPDATE salem_osm_sts SET rzip = NULL
+  WHERE rzip = '0';
+
 COMMIT;
