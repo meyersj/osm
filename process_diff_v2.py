@@ -4,7 +4,7 @@ from arcpy import env
 sys.stdout = codecs.getwriter('utf-8')(sys.stdout)
 
 #sys.argv
-in_rlis = sys.argv[1]
+in_jurisd = sys.argv[1]
 in_osm = sys.argv[2]
 out_file = sys.argv[3]
 out_dir = sys.argv[4]
@@ -20,20 +20,20 @@ except IOError:
 
 temp_regions_overlay = out_dir + 'regions_overlay.shp'
 temp_osm_buffer = out_dir + 'osm_buffer.shp'
-temp_rlis_dissolve = out_dir + 'rlis_dissolve.shp'
+temp_jurisd_dissolve = out_dir + 'jurisd_dissolve.shp'
 temp_box = out_dir + 'box.shp'
 temp_box_buffer_union = out_dir + 'box_union.shp'
-temp_rlis_needed = out_dir + 'rlis_needed.shp'
-temp_rlis_needed_single = out_dir + 'rlis_needed_single.shp'
+temp_jurisd_needed = out_dir + 'jurisd_needed.shp'
+temp_jurisd_needed_single = out_dir + 'jurisd_needed_single.shp'
 
 #sys.argv
-out_rlis_final = out_dir + out_file
+out_jurisd_final = out_dir + out_file
 
 #env.workspace = in_dir
 env.overwriteOutput = True
 
 print "dissolve"
-arcpy.Dissolve_management(in_rlis, temp_rlis_dissolve, dissolve_fields, '', "SINGLE_PART", "DISSOLVE_LINES")
+arcpy.Dissolve_management(in_jurisd, temp_jurisd_dissolve, dissolve_fields, '', "SINGLE_PART", "DISSOLVE_LINES")
 print "region overlay then buffer"
 arcpy.Intersect_analysis([in_regions, in_osm], temp_regions_overlay, '', '', '')
 arcpy.Buffer_analysis(temp_regions_overlay, temp_osm_buffer, 'buffer' , '', '', 'ALL', '')
@@ -59,31 +59,31 @@ arcpy.MakeFeatureLayer_management(temp_box_buffer_union, 'intersect')
 arcpy.SelectLayerByAttribute_management ('intersect', 'NEW_SELECTION', ' "FID_osm_bu" = -1 ')
 
 print "intersect"
-arcpy.Intersect_analysis([temp_rlis_dissolve, 'intersect'], temp_rlis_needed, 'ALL', '', '')
+arcpy.Intersect_analysis([temp_jurisd_dissolve, 'intersect'], temp_jurisd_needed, 'ALL', '', '')
 
 print "multipart to singlepart"
-arcpy.MultipartToSinglepart_management(temp_rlis_needed, temp_rlis_needed_single)
+arcpy.MultipartToSinglepart_management(temp_jurisd_needed, temp_jurisd_needed_single)
 
 print "add and query length field"
-arcpy.AddField_management(temp_rlis_needed_single, 'length', 'DOUBLE')
-arcpy.CalculateField_management(temp_rlis_needed_single, 'length', "!SHAPE.LENGTH@FEET!", "PYTHON_9.3")
-arcpy.MakeFeatureLayer_management (temp_rlis_needed_single, 'rlis_trails')
-arcpy.SelectLayerByAttribute_management ('rlis_trails', 'NEW_SELECTION', ' "length" > 50 ')
-arcpy.DeleteField_management('rlis_trails', 'FID_rlis_t')
-arcpy.DeleteField_management('rlis_trails', 'FID_buffer')
-arcpy.DeleteField_management('rlis_trails', 'FID_osm_tr')
-arcpy.DeleteField_management('rlis_trails', 'Id')
-arcpy.DeleteField_management('rlis_trails', 'FID_box')
-arcpy.DeleteField_management('rlis_trails', 'Id_1')
+arcpy.AddField_management(temp_jurisd_needed_single, 'length', 'DOUBLE')
+arcpy.CalculateField_management(temp_jurisd_needed_single, 'length', "!SHAPE.LENGTH@FEET!", "PYTHON_9.3")
+arcpy.MakeFeatureLayer_management (temp_jurisd_needed_single, 'jurisd_trails')
+arcpy.SelectLayerByAttribute_management ('jurisd_trails', 'NEW_SELECTION', ' "length" > 50 ')
+arcpy.DeleteField_management('jurisd_trails', 'FID_jurisd_t')
+arcpy.DeleteField_management('jurisd_trails', 'FID_buffer')
+arcpy.DeleteField_management('jurisd_trails', 'FID_osm_tr')
+arcpy.DeleteField_management('jurisd_trails', 'Id')
+arcpy.DeleteField_management('jurisd_trails', 'FID_box')
+arcpy.DeleteField_management('jurisd_trails', 'Id_1')
 
 print "export"
-arcpy.CopyFeatures_management('rlis_trails', out_rlis_final)
+arcpy.CopyFeatures_management('jurisd_trails', out_jurisd_final)
 
 print "cleaning up"
 arcpy.Delete_management(temp_osm_buffer)
 arcpy.Delete_management(temp_regions_overlay)
-arcpy.Delete_management(temp_rlis_dissolve)
+arcpy.Delete_management(temp_jurisd_dissolve)
 arcpy.Delete_management(temp_box)
 arcpy.Delete_management(temp_box_buffer_union)
-arcpy.Delete_management(temp_rlis_needed)
-arcpy.Delete_management(temp_rlis_needed_single)
+arcpy.Delete_management(temp_jurisd_needed)
+arcpy.Delete_management(temp_jurisd_needed_single)
