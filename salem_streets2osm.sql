@@ -1,8 +1,8 @@
 --Created By: Jeffrey Meyers
 --Contact: jeffrey dot alan dot meyers at gmail dot com
 --For: TriMet
---Created: October 2013
---Updated: October 2013
+--Created on: October 2013
+--Updated on: October 2013
 --Derived From: rlis_streets2osm.sql initially created by Melelani Sax-Barnett in October 2012
 
 --TODO
@@ -124,7 +124,7 @@ UPDATE salem_osm_sts SET fetype = 'Trail'
 UPDATE salem_osm_sts SET fetype = 'Way'
    WHERE fetype = 'WY';
  
---*****************************************************************************************************************************************************************************************************************************
+--*****************************************************************************************
 --Proper case basic name
 --Below function from "Jonathan Brinkman" <JB(at)BlackSkyTech(dot)com> http://archives.postgresql.org/pgsql-sql/2010-09/msg00088.php
 
@@ -201,7 +201,7 @@ VOLATILE
 CALLED ON NULL INPUT
 SECURITY INVOKER
 COST 100;
---*****************************************************************************************************************************************************************************************************************************
+--*****************************************************************************************
 
 --5) run format_titlecase on each value in fename
 UPDATE salem_osm_sts SET fename = format_titlecase(fename);

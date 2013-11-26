@@ -4,15 +4,36 @@
 --Created on: November 2013
 --Updated on: November 2013
 
+/*
+This sql script creates a diff table showing differences in geometry between osm and jurisdictional data.
+The expected schema of the jurisdictional data for this script is what rlis_streets2osm.sql produces.
+
+Column Names:
+  geom
+  oneway
+  direction
+  name
+  description
+  highway
+  access
+  service
+  surface
+  pc_left
+  pc_right
+
+
+This script expects three arguments to be passed when running it.
+  osm=osm data (osm data filtered for highways)
+  jurisd=jurisdictional data (rlis streets)
+  buf_size = name of table used to increase buffer size in rural areas
+  diff=name of output table
+
+Example Usage:
+  psql -U postgres -d dbname -v osm=osm_table -v jurisd=rlis_table -v buf_size=urban_buffers -v diff=rlis_diff -f generate_diff_rlis_streets.sql
+*/
+
 
 BEGIN;
-
-DROP TABLE IF EXISTS osm_buffer;
-DROP TABLE IF EXISTS grid;
-DROP TABLE IF EXISTS buffer_box;
-DROP TABLE IF EXISTS jurisd_box;
-DROP TABLE IF EXISTS :diff;
-
 --**********************************************************************************
 --function to create fishnet
 --source: http://trac.osgeo.org/postgis/wiki/UsersWikiCreateFishnet
@@ -33,11 +54,17 @@ CREATE OR REPLACE FUNCTION ST_CreateFishnet(
          $$ LANGUAGE sql IMMUTABLE STRICT;
 --**********************************************************************************
 
-
+DROP TABLE IF EXISTS osm_buffer;
 CREATE TABLE osm_buffer AS
 (
-  SELECT ST_Buffer(osm.geom, 30) AS geom
-  FROM :osm AS osm
+  SELECT ST_Buffer(sq.geom, sq.buf_size) AS geom
+    FROM
+    (
+      SELECT ub.buffer AS buf_size,
+             ST_Intersection(ub.geom, osm.geom) AS geom
+        FROM :buf_size AS ub, :osm AS osm
+        WHERE ST_Intersects(ub.geom, osm.geom)
+    ) AS sq
 );
 
 CREATE INDEX ON osm_buffer using gist(geom);
@@ -63,6 +90,7 @@ CREATE VIEW initial_grid AS
     (SELECT y_orig FROM extents)) AS cells
 );
 
+DROP TABLE IF EXISTS grid;
 CREATE TABLE grid AS
 (
   SELECT (ST_Dump(st_collect)).geom AS geom
@@ -79,6 +107,7 @@ UPDATE grid SET grid_id = nextval('grid_seq');
 DROP SEQUENCE grid_seq;
 CREATE INDEX ON grid USING gist(geom);
 
+DROP TABLE IF EXISTS buffer_box;
 CREATE TABLE buffer_box AS
 (
   SELECT grid.grid_id,
@@ -93,20 +122,41 @@ CREATE INDEX ON buffer_box USING gist(geom);
 
 CREATE TABLE jurisd_dissolve AS
 (
-  SELECT sq.prefix,
-         sq.streetname,
-         sq.ftype,
+  SELECT sq.oneway,
+         sq.direction,
+         sq.name,
+         sq.description,
+         sq.highway,
+         sq.access,
+         sq.service,
+         sq.surface,
+         sq.pc_left,
+         sq.pc_right,
          (ST_Dump(sq.geom)).geom AS geom
     FROM 
     (
-      SELECT jurisd.prefix,
-             jurisd.streetname,
-             jurisd.ftype,
+      SELECT jurisd.oneway,
+             jurisd.direction,
+             jurisd.name,
+             jurisd.description,
+             jurisd.highway,
+             jurisd.access,
+             jurisd.service,
+             jurisd.surface,
+             jurisd.pc_left,
+             jurisd.pc_right,
              ST_LineMerge(ST_Union(jurisd.geom)) AS geom
         FROM :jurisd AS jurisd
-        GROUP BY jurisd.prefix,
-                 jurisd.streetname,
-                 jurisd.ftype
+        GROUP BY jurisd.oneway,
+                 jurisd.direction,
+                 jurisd.name,
+                 jurisd.description,
+                 jurisd.highway,
+                 jurisd.access,
+                 jurisd.service,
+                 jurisd.surface,
+                 jurisd.pc_left,
+                 jurisd.pc_right
     ) AS sq
 );
 
@@ -116,13 +166,21 @@ UPDATE jurisd_dissolve SET gid = nextval('jurisd_seq');
 DROP SEQUENCE jurisd_seq;
 CREATE INDEX ON jurisd_dissolve USING gist(geom);
 
+DROP TABLE IF EXISTS jurisd_box;
 CREATE TABLE jurisd_box AS
 (
-  SELECT jurisd.gid,
-         jurisd.prefix,
-         jurisd.streetname,
-         jurisd.ftype,
-         grid.grid_id,
+  SELECT grid.grid_id,
+         jurisd.gid,
+         jurisd.oneway,
+         jurisd.direction,
+         jurisd.name,
+         jurisd.description,
+         jurisd.highway,
+         jurisd.access,
+         jurisd.service,
+         jurisd.surface,
+         jurisd.pc_left,
+         jurisd.pc_right,
          ST_Intersection(grid.geom, jurisd.geom) AS geom
     FROM grid, jurisd_dissolve AS jurisd
     WHERE ST_Intersects(grid.geom, jurisd.geom)
@@ -135,31 +193,61 @@ CREATE INDEX ON jurisd_box USING gist(geom);
 CREATE VIEW initial_diff AS
 (
   SELECT jurisd.gid,
-         jurisd.prefix,
-         jurisd.streetname,
-         jurisd.ftype,
+         jurisd.oneway,
+         jurisd.direction,
+         jurisd.name,
+         jurisd.description,
+         jurisd.highway,
+         jurisd.access,
+         jurisd.service,
+         jurisd.surface,
+         jurisd.pc_left,
+         jurisd.pc_right,
          ST_Difference(jurisd.geom, buffer.geom) AS geom
     FROM jurisd_box AS jurisd, buffer_box AS buffer
     WHERE jurisd.grid_id = buffer.grid_id
   UNION
   SELECT jurisd.gid,
-         jurisd.prefix,
-         jurisd.streetname,
-         jurisd.ftype,
+         jurisd.oneway,
+         jurisd.direction,
+         jurisd.name,
+         jurisd.description,
+         jurisd.highway,
+         jurisd.access,
+         jurisd.service,
+         jurisd.surface,
+         jurisd.pc_left,
+         jurisd.pc_right,
          jurisd.geom
     FROM jurisd_box AS jurisd
     WHERE jurisd.grid_id NOT IN (SELECT grid_id FROM buffer_box)
 );
 
+DROP TABLE IF EXISTS :diff;
 CREATE TABLE :diff AS
 (
-  SELECT jurisd.gid,
-         jurisd.prefix,
-         jurisd.streetname,
-         jurisd.ftype,
+  SELECT jurisd.oneway,
+         jurisd.direction,
+         jurisd.name,
+         jurisd.description,
+         jurisd.highway,
+         jurisd.access,
+         jurisd.service,
+         jurisd.surface,
+         jurisd.pc_left,
+         jurisd.pc_right,
          ST_Union(jurisd.geom) AS geom
     FROM initial_diff as jurisd
-    GROUP BY jurisd.gid, jurisd.prefix, jurisd.streetname, jurisd.ftype
+    GROUP BY jurisd.oneway,
+             jurisd.direction,
+             jurisd.name,
+             jurisd.description,
+             jurisd.highway,
+             jurisd.access,
+             jurisd.service,
+             jurisd.surface,
+             jurisd.pc_left,
+             jurisd.pc_right
 );
 
 ALTER TABLE :diff ADD length real;

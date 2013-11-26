@@ -16,6 +16,8 @@ SET style_dir=P:\osm\rlis2osm_verify\7_county\
 SET osm_dir=P:\osm\rlis2osm_verify\postgis\output\osmfiles\
 SET shape_dir=P:\osm\rlis2osm_verify\postgis\output\shapefiles\
 SET ogr2osm_dir=G:\PUBLIC\OpenStreetMap\data\RLIS_update_2013\ogr2osm\
+SET util_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\utilities\
+
 
 SET match=False
 
@@ -44,7 +46,8 @@ IF %type%==streets (
   call osmosis --rx G:\PUBLIC\OpenStreetMap\data\osm\multnomah.osm ^
   --rx G:\PUBLIC\OpenStreetMap\data\osm\washington.osm ^
   --rx G:\PUBLIC\OpenStreetMap\data\osm\clackamas.osm ^
-  --m --m ^
+  --rx G:\PUBLIC\OpenStreetMap\data\osm\yamhill.osm ^
+  --m --m --m ^
   --tf accept-ways highway=* ^
   --tf reject-ways highway=construction,path,footway,pedestrian,steps,bridleway ^
   --tf reject-relations ^
@@ -67,25 +70,33 @@ call psql -U postgres -d %db% -f "C:\Program Files\PostgreSQL\9.2\share\contrib\
 
 REM -import osm file into postgis database just created
 echo uploading osm into database
-call osm2pgsql -U postgres -d %db% -S %style_dir%!style! %osm_dir%!osm_filtered!
-call psql -U postgres -d %db% -f "%rlis_dir%project.sql"
-
+call osm2pgsql -U postgres -d %db% -S %util_dir%!style! %osm_dir%!osm_filtered!
+call psql -U postgres -d %db% -f "%util_dir%project.sql"
+call shp2pgsql -I -s 2913 %util_dir%oregon_urban_buffers.shp urban_buf | psql -U postgres -d %db% 
 
 IF %type%==streets (
-  REM -import RLIS streets file and run sql conversion script
+  REM import RLIS streets file and run sql conversion script and diff generation
   echo uplading rlis streets into database
-  call shp2pgsql -I -s 2913 %rlis_dir%streets.shp rlis_streets | psql -U postgres -d %db% 
-  call psql -U postgres -d %db% -f "%rlis_dir%rlis_streets2osm.sql"
+  call shp2pgsql -I -s 2913 G:\Rlis\STREETS\streets.shp rlis_streets | psql -U postgres -d %db% 
+  call psql -U postgres -d %db% -f "%util_dir%rlis_streets2osm.sql"
+  
+  echo generating diff table
+  call psql -U postgres -d %db% -f "generate_diff_rlis_streets.sql" -v osm=planet_osm_line -v jurisd=osm_sts -v buf_size=urban_buf -v diff=rlis_streets_diff
+
+  REM export generated diff
+  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff.shp %db% rlis_streets_diff
+
+  REM ogr2osm.py script to export shapefile diff to osm file
+  call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%rlis_streets_diff.shp -o %osm_dir%rlis_streets_diff.osm -t %util_dir%ogr2osm\translations\rlis_streets.py
 
 
   REM -export line table from postgis database to shapefile
-  echo exporting osm and rlis streets to shapefile
-  call pgsql2shp -k -u postgres -P password -f %shape_dir%osm_streets_2913.shp %db% planet_osm_line
-  call pgsql2shp -k -u postgres -P password -f %shape_dir%rlis_streets_2913.shp %db% osm_sts
-  call python process_diff_v2.py %shape_dir%rlis_streets_2913.shp %shape_dir%osm_streets_2913.shp rlis_streets_diff.shp
+  REM echo exporting osm and rlis streets to shapefile
+  REM call pgsql2shp -k -u postgres -P password -f %shape_dir%osm_streets_2913.shp %db% planet_osm_line
+  REM call pgsql2shp -k -u postgres -P password -f %shape_dir%rlis_streets_2913.shp %db% osm_sts
+  REM call python process_diff_v2.py %shape_dir%rlis_streets_2913.shp %shape_dir%osm_streets_2913.shp rlis_streets_diff.shp
 
-  REM TODO ogr2osm.py script to export shapefile diff to osm file
-  call python %ogr2osm_dir%ogr2osm.py rlis_streets_diff.shp -o %osm_dir%rlis_streets_diff.osm -t translations\rlis_streets.py
+  
 )
 
 IF %type%==trails (
@@ -107,5 +118,5 @@ IF %type%==trails (
 )
 
 
-call psql -U postgres -c "DROP DATABASE %db%;"
+REM call psql -U postgres -c "DROP DATABASE %db%;"
 
