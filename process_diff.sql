@@ -34,14 +34,20 @@ CREATE OR REPLACE FUNCTION ST_CreateFishnet(
 --**********************************************************************************
 
 
+--example usage
+
+--psql -U postgres -d db_name -v osm=osm_table -v jurisd=jurisid_data_table -v diff=output_table -f process_diff.sql
+
+--Create buffer on osm file passed in as argument
 CREATE TABLE osm_buffer AS
 (
   SELECT ST_Buffer(osm.geom, 30) AS geom
   FROM :osm AS osm
 );
 
-CREATE INDEX ON osm_buffer using gist(geom);
+CREATE INDEX ON osm_buffer USING gist(geom);
 
+--create view with extents of osm_buffer
 CREATE VIEW extents AS
 (
   SELECT ST_Xmin(ST_Extent(geom)) AS x_orig, 
@@ -51,6 +57,8 @@ CREATE VIEW extents AS
     FROM osm_buffer
 );
 
+
+--build fishnet using extent of osm_buffer with cell sizes of 1320(map units)
 CREATE VIEW initial_grid AS 
 (
   SELECT ST_Collect(cells.geom)
@@ -63,6 +71,7 @@ CREATE VIEW initial_grid AS
     (SELECT y_orig FROM extents)) AS cells
 );
 
+--create different feature for each cell in fishnet
 CREATE TABLE grid AS
 (
   SELECT (ST_Dump(st_collect)).geom AS geom
@@ -72,13 +81,17 @@ CREATE TABLE grid AS
 DROP VIEW initial_grid;
 DROP VIEW extents;
 
+--set projection of grid
 UPDATE grid SET geom = ST_SetSRID(geom, 2913);
+
+--create unique grid_id for each cell
 CREATE SEQUENCE grid_seq;
 ALTER TABLE grid ADD grid_id int;
 UPDATE grid SET grid_id = nextval('grid_seq');
 DROP SEQUENCE grid_seq;
 CREATE INDEX ON grid USING gist(geom);
 
+--intersect osm_buffer with grid and dissolve buffers in each cell
 CREATE TABLE buffer_box AS
 (
   SELECT grid.grid_id,
@@ -91,6 +104,11 @@ CREATE TABLE buffer_box AS
 CREATE INDEX ON buffer_box USING btree(grid_id);
 CREATE INDEX ON buffer_box USING gist(geom);
 
+
+--TODO this query doesn't work right.
+--more features are dissolved than should be even if they don't touch
+
+--dissolve jurisidctional data by attributes and merge only touching line segments
 CREATE TABLE jurisd_dissolve AS
 (
   SELECT sq.prefix,
@@ -110,12 +128,16 @@ CREATE TABLE jurisd_dissolve AS
     ) AS sq
 );
 
+
+--create unique id on intersecting jurisdictional data
 CREATE SEQUENCE jurisd_seq;
 ALTER TABLE jurisd_dissolve ADD gid int;
 UPDATE jurisd_dissolve SET gid = nextval('jurisd_seq');
 DROP SEQUENCE jurisd_seq;
 CREATE INDEX ON jurisd_dissolve USING gist(geom);
 
+
+--intersect dissolved jurisdictional data with grid
 CREATE TABLE jurisd_box AS
 (
   SELECT jurisd.gid,
@@ -132,6 +154,9 @@ DROP TABLE jurisd_dissolve;
 CREATE INDEX ON jurisd_box USING btree(grid_id);
 CREATE INDEX ON jurisd_box USING gist(geom);
 
+
+--where gridded buffer and gridded jurisdictional data have same grid id take difference
+--if jurisdictional data grid_id is not in the gridded buffer select it as well
 CREATE VIEW initial_diff AS
 (
   SELECT jurisd.gid,
@@ -151,6 +176,11 @@ CREATE VIEW initial_diff AS
     WHERE jurisd.grid_id NOT IN (SELECT grid_id FROM buffer_box)
 );
 
+
+--TODO this query may need to be corrected as well
+--output is not what is expected
+
+--create final table same intial streets together
 CREATE TABLE :diff AS
 (
   SELECT jurisd.gid,
@@ -162,6 +192,7 @@ CREATE TABLE :diff AS
     GROUP BY jurisd.gid, jurisd.prefix, jurisd.streetname, jurisd.ftype
 );
 
+--delete any segments shorter than 50 ft
 ALTER TABLE :diff ADD length real;
 UPDATE :diff SET length = ST_Length(geom);
 DELETE FROM :diff WHERE length < 50;
