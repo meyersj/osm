@@ -55,9 +55,21 @@ CREATE OR REPLACE FUNCTION ST_CreateFishnet(
 
 CREATE TABLE osm_buffer AS
 (
-  SELECT ST_Buffer(geom, 30) AS geom
-  FROM :osm
+  SELECT ST_Buffer(sq.geom, sq.buf_size) AS geom
+    FROM
+    (
+      SELECT ub.buffer AS buf_size,
+             ST_Intersection(ub.geom, osm.geom) AS geom
+        FROM :buf_size AS ub, :osm AS osm
+        WHERE ST_Intersects(ub.geom, osm.geom)
+    ) AS sq
 );
+
+--CREATE TABLE osm_buffer AS
+--(
+--  SELECT ST_Buffer(geom, 30) AS geom
+--  FROM :osm
+--);
 
 CREATE INDEX ON osm_buffer using gist(geom);
 
@@ -114,6 +126,7 @@ CREATE TABLE jurisd_box AS
          jurisd.bicycle,
          jurisd.cycleway,
          jurisd."RLIS:bicycle",
+         jurisd.bikemode,
          ST_Intersection(grid.geom, jurisd.geom) AS geom
     FROM grid, :jurisd AS jurisd
     WHERE ST_Intersects(grid.geom, jurisd.geom)
@@ -131,6 +144,7 @@ CREATE VIEW initial_diff AS
          jurisd.bicycle,
          jurisd.cycleway,
          jurisd."RLIS:bicycle",
+         jurisd.bikemode,
          ST_Difference(jurisd.geom, buffer.geom) AS geom
     FROM jurisd_box AS jurisd, buffer_box AS buffer
     WHERE jurisd.grid_id = buffer.grid_id
@@ -142,6 +156,7 @@ CREATE VIEW initial_diff AS
          jurisd.bicycle,
          jurisd.cycleway,
          jurisd."RLIS:bicycle",
+         jurisd.bikemode,
          jurisd.geom
     FROM jurisd_box AS jurisd
     WHERE jurisd.grid_id NOT IN (SELECT grid_id FROM buffer_box)
@@ -151,13 +166,13 @@ CREATE VIEW initial_diff AS
 DROP TABLE IF EXISTS :diff;
 CREATE TABLE :diff AS
 (
-  SELECT jurisd.gid,
-         jurisd.name,
-         jurisd.highway,
-         jurisd.proposed,
-         jurisd.bicycle,
-         jurisd.cycleway,
-         jurisd."RLIS:bicycle",
+  SELECT sq.name,
+         sq.highway,
+         sq.proposed,
+         sq.bicycle,
+         sq.cycleway,
+         sq."RLIS:bicycle",
+         sq.bikemode,
          (ST_Dump(sq.geom)).geom AS geom
     FROM 
     (
@@ -167,14 +182,16 @@ CREATE TABLE :diff AS
              diff.bicycle,
              diff.cycleway,
              diff."RLIS:bicycle",
+             diff.bikemode,
              ST_LineMerge(ST_Union(diff.geom)) AS geom
-        FROM initial_diff AS jurisd
+        FROM initial_diff AS diff
         GROUP BY diff.name,
              diff.highway,
              diff.proposed,
              diff.bicycle,
              diff.cycleway,
-             diff."RLIS:bicycle"
+             diff."RLIS:bicycle",
+             diff.bikemode
     ) AS sq
 );
 

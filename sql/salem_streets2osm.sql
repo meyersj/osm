@@ -16,11 +16,11 @@ DROP TABLE IF EXISTS salem_osm_sts CASCADE;
 CREATE TABLE salem_osm_sts (
     id serial PRIMARY KEY,
     gid int REFERENCES ctrline,
-    geom geometry,
+    geom geometry, --geometry for osm
 	name text, --osm tag derived from fedirp + fename + fetype + fedirs
 	highway text, --osm tag derived from type
-	access text,
-	service text,
+	access text, --osm tag
+	service text, --osm tag
 	type text,
 	fedirp text,
 	fename text,

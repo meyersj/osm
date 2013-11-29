@@ -10,16 +10,12 @@ The expected schema of the jurisdictional data for this script is what rlis_stre
 
 Column Names:
   geom
-  oneway
-  direction
   name
-  description
   highway
   access
   service
-  surface
-  pc_left
-  pc_right
+  lzip
+  rzip
 
 
 This script expects three arguments to be passed when running it.
@@ -114,16 +110,12 @@ CREATE TABLE jurisd_box AS
 (
   SELECT grid.grid_id,
          jurisd.gid,
-         jurisd.oneway,
-         jurisd.direction,
          jurisd.name,
-         jurisd.description,
          jurisd.highway,
          jurisd.access,
          jurisd.service,
-         jurisd.surface,
-         jurisd.pc_left,
-         jurisd.pc_right,
+         jurisd.lzip,
+         jurisd.rzip,
          ST_Intersection(grid.geom, jurisd.geom) AS geom
     FROM grid, :jurisd AS jurisd
     WHERE ST_Intersects(grid.geom, jurisd.geom)
@@ -135,31 +127,23 @@ CREATE INDEX ON jurisd_box USING gist(geom);
 CREATE VIEW initial_diff AS
 (
   SELECT jurisd.gid,
-         jurisd.oneway,
-         jurisd.direction,
          jurisd.name,
-         jurisd.description,
          jurisd.highway,
          jurisd.access,
          jurisd.service,
-         jurisd.surface,
-         jurisd.pc_left,
-         jurisd.pc_right,
+         jurisd.lzip,
+         jurisd.rzip,
          ST_Difference(jurisd.geom, buffer.geom) AS geom
     FROM jurisd_box AS jurisd, buffer_box AS buffer
     WHERE jurisd.grid_id = buffer.grid_id
   UNION
   SELECT jurisd.gid,
-         jurisd.oneway,
-         jurisd.direction,
          jurisd.name,
-         jurisd.description,
          jurisd.highway,
          jurisd.access,
          jurisd.service,
-         jurisd.surface,
-         jurisd.pc_left,
-         jurisd.pc_right,
+         jurisd.lzip,
+         jurisd.rzip,
          jurisd.geom
     FROM jurisd_box AS jurisd
     WHERE jurisd.grid_id NOT IN (SELECT grid_id FROM buffer_box)
@@ -169,41 +153,29 @@ CREATE VIEW initial_diff AS
 DROP TABLE IF EXISTS :diff;
 CREATE TABLE :diff AS
 (
-  SELECT sq.oneway,
-         sq.direction,
-         sq.name,
-         sq.description,
+  SELECT sq.name,
          sq.highway,
          sq.access,
          sq.service,
-         sq.surface,
-         sq.pc_left,
-         sq.pc_right,
+         sq.lzip,
+         sq.rzip,
          (ST_Dump(sq.geom)).geom AS geom
     FROM 
     (
-      SELECT diff.oneway,
-             diff.direction,
-             diff.name,
-             diff.description,
+      SELECT diff.name,
              diff.highway,
              diff.access,
              diff.service,
-             diff.surface,
-             diff.pc_left,
-             diff.pc_right,
+             diff.lzip,
+             diff.rzip,
              ST_LineMerge(ST_Union(diff.geom)) AS geom
         FROM initial_diff AS diff
-        GROUP BY diff.oneway,
-                 diff.direction,
-                 diff.name,
-                 diff.description,
+        GROUP BY diff.name,
                  diff.highway,
                  diff.access,
                  diff.service,
-                 diff.surface,
-                 diff.pc_left,
-                 diff.pc_right
+                 diff.lzip,
+                 diff.rzip
     ) AS sq
 );
 
