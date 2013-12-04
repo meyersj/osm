@@ -65,8 +65,9 @@ IF %match%==False (
 REM -create spatially enabled database with name passed as parameter from user
 echo creating database
 call psql -U postgres -c "CREATE DATABASE %db%;"
-call psql -U postgres -d %db% -f "C:\Program Files\PostgreSQL\9.2\share\contrib\postgis-2.0\postgis.sql"
-call psql -U postgres -d %db% -f "C:\Program Files\PostgreSQL\9.2\share\contrib\postgis-2.0\spatial_ref_sys.sql"
+call psql -U postgres -d %db% -c "CREATE EXTENSION postgis;"
+REM call psql -U postgres -d %db% -f "C:\Program Files\PostgreSQL\9.2\share\contrib\postgis-2.0\postgis.sql"
+REM call psql -U postgres -d %db% -f "C:\Program Files\PostgreSQL\9.2\share\contrib\postgis-2.0\spatial_ref_sys.sql"
 
 REM -import osm file into postgis database just created
 echo uploading osm into database
