@@ -10,10 +10,14 @@ SET db=temp_database_11010
 REM take streets or trails keyword as parameter to affect how osmosis filters
 SET type=%1
 
+REM ****************************************************************
+REM SET shape_dir AND osm_dir TO CORRECT LOCATIONS BEFORE RUNNING!!!
+REM ****************************************************************
+
 
 SET rlis_dir=G:\Rlis\
-SET osm_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Dec_2013\RLIS\streets\backup\osm\
-SET shape_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Dec_2013\RLIS\streets\backup\shapefiles\
+SET osm_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Dec_2013\RLIS\trails\backup\osm\
+SET shape_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Dec_2013\RLIS\trails\backup\shapefiles\
 SET util_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\utilities\
 
 
@@ -28,7 +32,8 @@ IF %type%==trails (
   call osmosis --rx G:\PUBLIC\OpenStreetMap\data\osm\multnomah.osm ^
   --rx G:\PUBLIC\OpenStreetMap\data\osm\washington.osm ^
   --rx G:\PUBLIC\OpenStreetMap\data\osm\clackamas.osm ^
-  --m --m ^
+  --rx G:\PUBLIC\OpenStreetMap\data\osm\yamhill.osm ^
+  --m --m --m ^
   --tf reject-relations ^
   --wkv keyValueListFile=%util_dir%trail_tags.txt ^
   --un ^
@@ -58,14 +63,10 @@ IF %match%==False (
   exit /B
 )
 
-
-
 REM -create spatially enabled database with name passed as parameter from user
 echo creating database
 call psql -U postgres -c "CREATE DATABASE %db%;"
 call psql -U postgres -d %db% -c "CREATE EXTENSION postgis;"
-REM call psql -U postgres -d %db% -f "C:\Program Files\PostgreSQL\9.2\share\contrib\postgis-2.0\postgis.sql"
-REM call psql -U postgres -d %db% -f "C:\Program Files\PostgreSQL\9.2\share\contrib\postgis-2.0\spatial_ref_sys.sql"
 
 REM -import osm file into postgis database just created
 echo uploading osm into database
@@ -84,15 +85,15 @@ IF %type%==streets (
   echo generating diff table
   call psql -U postgres -d %db% -f "../sql/generate_diff_rlis_streets.sql" -v osm=planet_osm_line -v jurisd=osm_sts -v buf_size=urban_buf -v diff=rlis_streets_diff
 
-  call psql -U postgres -d %db% -f "../sql/split_county_rlis.sql"
+  call psql -U postgres -d %db% -f "../sql/split_county_rlis_streets.sql"
 
 
   REM export generated diff
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff.shp %db% rlis_streets_diff
-  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff.shp %db% rlis_streets_diff_wash
-  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff.shp %db% rlis_streets_diff_clack
-  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff.shp %db% rlis_streets_diff_mult
-  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff.shp %db% rlis_streets_diff_yam
+  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff_wash.shp %db% rlis_streets_diff_wash
+  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff_clack.shp %db% rlis_streets_diff_clack
+  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff_mult.shp %db% rlis_streets_diff_mult
+  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff_yam.shp %db% rlis_streets_diff_yam
 
 
   REM ogr2osm.py script to export shapefile diff to osm file
@@ -104,7 +105,6 @@ IF %type%==streets (
 )
 
 
-REM TODO create generate_diff_rlis_trails.sql
 IF %type%==trails (
 
   REM -import RLIS file and run sql conversion script
@@ -113,19 +113,26 @@ IF %type%==trails (
   call psql -U postgres -d %db% -f "%util_dir%rlis_trails2osm.sql"
 
   
-  call psql -U postgres -d %db% -f "generate_diff_rlis_trails.sql" -v REM TODO corrections...........................
+  call psql -U postgres -d %db% -f "generate_diff_rlis_trails.sql" -v osm=planet_osm_line -v jurisd=osm_trails -v buf_size=urban_buf -v diff=rlis_trails_diff -f "../sql/generate_diff_rlis_trails.sql"
   
-  REM -export line table from postgis database to shapefile
-  echo exporting osm and rlis trails to shapefile
-  call pgsql2shp -k -u postgres -P password -f %shape_dir%osm_trails_2913.shp %db% planet_osm_line
-  call pgsql2shp -k -u postgres -P password -f %shape_dir%rlis_trails_2913.shp %db% osm_trails
-  call python process_diff_v2.py %shape_dir%rlis_trails_2913.shp %shape_dir%osm_trails_2913.shp rlis_trails_diff.shp
-  
-  REM TODO ogr2osm.py script to export shapefile diff to osm file
-  call python %ogr2osm_dir%ogr2osm.py rlis_trails_diff.shp -o %osm_dir%rlis_trails_diff.osm -t translations\rlis_trails.py
+  call psql -U postgres -d %db% -f "../sql/split_county_rlis_trails.sql"
 
+
+  REM export generated diff
+  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_trails_diff.shp %db% rlis_trails_diff
+  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_trails_diff_wash.shp %db% rlis_trails_diff_wash
+  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_trails_diff_clack.shp %db% rlis_trails_diff_clack
+  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_trails_diff_mult.shp %db% rlis_trails_diff_mult
+  call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_trails_diff_yam.shp %db% rlis_trails_diff_yam
+
+
+  REM ogr2osm.py script to export shapefile diff to osm file
+  call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%rlis_trails_diff.shp -o %osm_dir%rlis_trails_diff.osm -t %util_dir%ogr2osm\translations\rlis_trails.py
+  call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%rlis_trails_diff_wash.shp -o %osm_dir%rlis_trails_diff_wash.osm -t %util_dir%ogr2osm\translations\rlis_trails.py
+  call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%rlis_trails_diff_clack.shp -o %osm_dir%rlis_trails_diff_clack.osm -t %util_dir%ogr2osm\translations\rlis_trails.py
+  call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%rlis_trails_diff_mult.shp -o %osm_dir%rlis_trails_diff_mult.osm -t %util_dir%ogr2osm\translations\rlis_trails.py
+  call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%rlis_trails_diff_yam.shp -o %osm_dir%rlis_trails_diff_yam.osm -t %util_dir%ogr2osm\translations\rlis_trails.py
 )
-
 
 call psql -U postgres -c "DROP DATABASE %db%;"
 
