@@ -37,7 +37,7 @@ call psql -U postgres -d %db% -f "%util_dir%project.sql"
 REM import jurisdictional data run sql conversion script
 echo uplading rlis streets into database
 call shp2pgsql -I -s 2913 %in_data_dir%ctrline.shp ctrline | psql -U postgres -d %db% 
-call psql -U postgres -d %db% -f "%util_dir%salem_streets2osm.sql"
+call psql -U postgres -d %db% -f "..\sql\salem_streets2osm.sql"
 call shp2pgsql -I -s 2913 %util_dir%oregon_urban_buffers.shp urban_buf | psql -U postgres -d %db%
 
 REM run diff creation sql script
