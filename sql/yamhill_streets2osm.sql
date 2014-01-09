@@ -116,7 +116,25 @@ UPDATE yamhill_osm_sts SET addr_st = 'Way'
    WHERE addr_st = 'WAY';
 UPDATE yamhill_osm_sts SET addr_st = NULL
    WHERE addr_st IN ('X', 'Y', 'Z');
+
+--5) fix surface tags
+UPDATE yamhill_osm_sts SET surface = NULL
+   WHERE surface IN ('PAVED', 'paved', 'PCC');
+UPDATE yamhill_osm_sts SET surface = 'unpaved'
+   WHERE surface IN ('GRAVEL', 'DIRT');
  
+--6) update type field with correct osm tag
+UPDATE yamhill_osm_sts SET highway = 'track'
+   WHERE owner IN ('BLM', 'USFS');
+UPDATE yamhill_osm_sts SET access = 'private'
+   WHERE owner IN ('Private', 'private');
+
+--7) update missing highway tags to FIXME
+UPDATE yamhill_osm_sts SET highway = 'FIXME'
+   WHERE highway IS NULL;
+
+
+
 --*****************************************************************************************
 --Proper case basic name
 --Below function from "Jonathan Brinkman" <JB(at)BlackSkyTech(dot)com> http://archives.postgresql.org/pgsql-sql/2010-09/msg00088.php
@@ -196,10 +214,10 @@ SECURITY INVOKER
 COST 100;
 --*****************************************************************************************
 
---5) run format_titlecase on each value in addr_sn
+--8) run format_titlecase on each value in addr_sn
 UPDATE yamhill_osm_sts SET addr_sn = format_titlecase(addr_sn);
 
---6) concatenate addr_pd, addr_sn, addr_st, addr_sd and insert into name
+--9) concatenate addr_pd, addr_sn, addr_st, addr_sd and insert into name
 UPDATE yamhill_osm_sts 
   SET name = subquery.name
   FROM 
@@ -214,11 +232,5 @@ UPDATE yamhill_osm_sts
    ) 
 AS subquery
 WHERE yamhill_osm_sts.gid = subquery.gid;
-
---7) update type field with correct osm tag
-UPDATE yamhill_osm_sts SET highway = 'track'
-  WHERE owner IN ('BLM', 'USFS');
-UPDATE yamhill_osm_sts SET access = 'private'
-  WHERE owner IN ('Private', 'private');
 
 COMMIT;

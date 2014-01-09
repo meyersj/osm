@@ -53,4 +53,9 @@ call pgsql2shp -k -u postgres -P password -f %shape_dir%salem_streets_diff.shp %
 REM convert diff shapefile to osm
 call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%salem_streets_diff.shp -o %osm_dir%salem_streets_diff.osm -t translations\salem_streets.py
 
+REM export all streets with new attributes as shapefile and convert to osm.
+call pgsql2shp -k -u postgres -P password -f %shape_dir%salem_streets_all.shp %db% salem_osm_sts
+call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%salem_streets_all.shp -o %osm_dir%salem_streets_all.osm -t translations\salem_streets.py
+
 call psql -U postgres -c "DROP DATABASE %db%;"
+call del %osm_dir%salem_osm_streets.osm
