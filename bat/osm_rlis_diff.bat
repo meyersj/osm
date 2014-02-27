@@ -1,11 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
-
 REM -Usage: spatial_db my_database_name
 
 REM choose default database name instead of taking name as parameter
-SET db=temp_database_11010
+SET db=foo_base
 
 REM take streets or trails keyword as parameter to affect how osmosis filters
 SET type=%1
@@ -16,8 +15,8 @@ REM ****************************************************************
 
 
 SET rlis_dir=G:\Rlis\
-SET osm_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Dec_2013\RLIS\trails\backup\osm\
-SET shape_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Dec_2013\RLIS\trails\backup\shapefiles\
+SET osm_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Feb_2013\test\
+SET shape_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Feb_2013\test\
 SET util_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\utilities\
 
 
@@ -72,21 +71,38 @@ REM -import osm file into postgis database just created
 echo uploading osm into database
 call osm2pgsql -U postgres -d %db% -S %util_dir%!style! %osm_dir%!osm_filtered!
 call psql -U postgres -d %db% -f "%util_dir%project.sql"
+call psql -U postgres -d %db% -c "ALTER TABLE planet_osm_line RENAME TO osm_filtered"
+call psql -U postgres -d %db% -c "ALTER INDEX planet_osm_line_index RENAME TO osm_filtered_index"
+
+REM -import false positive osm file
+call osm2pgsql -U postgres -d %db% -S %util_dir%!style! "../test/rlis_fpos.osm"
+call psql -U postgres -d %db% -f "%util_dir%project.sql"
+call psql -U postgres -d %db% -c "ALTER TABLE planet_osm_line RENAME TO fpos"
+call psql -U postgres -d %db% -c "ALTER INDEX planet_osm_line_index RENAME TO fpos_index"
+
+
 call shp2pgsql -I -s 2913 %util_dir%oregon_urban_buffers.shp urban_buf | psql -U postgres -d %db% 
 call shp2pgsql -I -s 2913 -W LATIN1 %rlis_dir%BOUNDARY\co_fill.shp co_fill | psql -U postgres -d %db% 
-
 
 IF %type%==streets (
   REM import RLIS streets file and run sql conversion script and diff generation
   echo uplading rlis streets into database
+  
   call shp2pgsql -I -s 2913 %rlis_dir%STREETS\streets.shp rlis_streets | psql -U postgres -d %db% 
   call psql -U postgres -d %db% -f "%util_dir%rlis_streets2osm.sql"
   
+  REM build rm_fpos.sql and generate_diff.sql using build_sql.py
+  call python ..\test\build_sql.py fpos ..\test\fpos_template.sql ..\sql\rm_fpos.sql %util_dir%rlis_streets_fields.txt
+  call python ..\test\build_sql.py dif ..\test\diff_template.sql ..\sql\generate_diff.sql %util_dir%rlis_streets_fields.txt
+  call python ..\test\build_sql.py split ..\sql\split_by_county.sql %util_dir%rlis_counties.txt rlis_streets
+
+
+  call psql -U postgres -d %db% -f "../sql/rm_fpos.sql" -v fpos=fpos -v jurisd=osm_sts -v fpos_final=osm_sts_fpos_rm
+
   echo generating diff table
-  call psql -U postgres -d %db% -f "../sql/generate_diff_rlis_streets.sql" -v osm=planet_osm_line -v jurisd=osm_sts -v buf_size=urban_buf -v diff=rlis_streets_diff
+  call psql -U postgres -d %db% -f "../sql/generate_diff.sql" -v osm=osm_filtered -v jurisd=osm_sts -v buf_size=urban_buf -v diff=rlis_streets_diff
 
-  call psql -U postgres -d %db% -f "../sql/split_county_rlis_streets.sql"
-
+  call psql -U postgres -d %db% -f "../sql/split_by_county.sql"
 
   REM export generated diff
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff.shp %db% rlis_streets_diff
@@ -94,7 +110,6 @@ IF %type%==streets (
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff_clack.shp %db% rlis_streets_diff_clack
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff_mult.shp %db% rlis_streets_diff_mult
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff_yam.shp %db% rlis_streets_diff_yam
-
 
   REM ogr2osm.py script to export shapefile diff to osm file
   call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%rlis_streets_diff.shp -o %osm_dir%rlis_streets_diff.osm -t %util_dir%ogr2osm\translations\rlis_streets.py
@@ -104,7 +119,7 @@ IF %type%==streets (
   call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%rlis_streets_diff_yam.shp -o %osm_dir%rlis_streets_diff_yam.osm -t %util_dir%ogr2osm\translations\rlis_streets.py
 )
 
-
+REM TODO update trails portion to use false positives
 IF %type%==trails (
 
   REM -import RLIS file and run sql conversion script

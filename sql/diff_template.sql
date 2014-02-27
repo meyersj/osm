@@ -5,22 +5,10 @@
 --Updated on: November 2013
 
 /*
-This sql script creates a diff table showing differences in geometry between osm and jurisdictional data.
-The expected schema of the jurisdictional data for this script is what rlis_streets2osm.sql produces.
+This sql template creates a diff table showing differences in geometry between osm and jurisdictional data.
 
-Column Names:
-  geom
-  oneway
-  direction
-  name
-  description
-  highway
-  access
-  service
-  surface
-  pc_left
-  pc_right
-
+This template needs to be used as input into build_sql.py in order to fill in the attributes that are relevant
+for specific jurisdicional set being used before in can be run as an sql file.
 
 This script expects three arguments to be passed when running it.
   osm=osm data (osm data filtered for highways)
@@ -29,7 +17,7 @@ This script expects three arguments to be passed when running it.
   diff=name of output table
 
 Example Usage:
-  psql -U postgres -d dbname -v osm=osm_table -v jurisd=rlis_table -v buf_size=urban_buffers -v diff=rlis_diff -f generate_diff_rlis_trails.sql
+  psql -U postgres -d dbname -v osm=osm_table -v jurisd=rlis_table -v buf_size=urban_buffers -v diff=rlis_diff -f generate_diff_rlis_streets.sql
 */
 
 BEGIN;
@@ -112,27 +100,9 @@ CREATE INDEX ON buffer_box USING gist(geom);
 
 CREATE TABLE jurisd_box AS
 (
-  SELECT grid.grid_id,
+  SELECT {{jurisd}}
+         grid.grid_id,
          jurisd.gid,
-         jurisd.systemname,
-         jurisd.abandoned,
-         jurisd.access,
-         jurisd.alt_name,
-         jurisd.bicycle,
-         jurisd.cnstrctn,
-         jurisd.est_width,
-         jurisd.fee,
-         jurisd.foot,
-         jurisd.highway,
-         jurisd.hwy_abndnd,
-         jurisd.horse,
-         jurisd.mtr_vhcle,
-         jurisd.mtb,
-         jurisd.name,
-         jurisd.operator,
-         jurisd.proposed,
-         jurisd.surface,
-         jurisd.wheelchair,
          ST_Intersection(grid.geom, jurisd.geom) AS geom
     FROM grid, :jurisd AS jurisd
     WHERE ST_Intersects(grid.geom, jurisd.geom)
@@ -143,50 +113,14 @@ CREATE INDEX ON jurisd_box USING gist(geom);
 
 CREATE VIEW initial_diff AS
 (
-  SELECT jurisd.gid,
-         jurisd.systemname,
-         jurisd.abandoned,
-         jurisd.access,
-         jurisd.alt_name,
-         jurisd.bicycle,
-         jurisd.cnstrctn,
-         jurisd.est_width,
-         jurisd.fee,
-         jurisd.foot,
-         jurisd.highway,
-         jurisd.hwy_abndnd,
-         jurisd.horse,
-         jurisd.mtr_vhcle,
-         jurisd.mtb,
-         jurisd.name,
-         jurisd.operator,
-         jurisd.proposed,
-         jurisd.surface,
-         jurisd.wheelchair,
+  SELECT {{jurisd}}
+         jurisd.gid,
          ST_Difference(jurisd.geom, buffer.geom) AS geom
     FROM jurisd_box AS jurisd, buffer_box AS buffer
     WHERE jurisd.grid_id = buffer.grid_id
   UNION
-  SELECT jurisd.gid,
-         jurisd.systemname,
-         jurisd.abandoned,
-         jurisd.access,
-         jurisd.alt_name,
-         jurisd.bicycle,
-         jurisd.cnstrctn,
-         jurisd.est_width,
-         jurisd.fee,
-         jurisd.foot,
-         jurisd.highway,
-         jurisd.hwy_abndnd,
-         jurisd.horse,
-         jurisd.mtr_vhcle,
-         jurisd.mtb,
-         jurisd.name,
-         jurisd.operator,
-         jurisd.proposed,
-         jurisd.surface,
-         jurisd.wheelchair,
+  SELECT {{jurisd}}
+         jurisd.gid,         
          jurisd.geom
     FROM jurisd_box AS jurisd
     WHERE jurisd.grid_id NOT IN (SELECT grid_id FROM buffer_box)
@@ -196,68 +130,14 @@ CREATE VIEW initial_diff AS
 DROP TABLE IF EXISTS :diff;
 CREATE TABLE :diff AS
 (
-  SELECT sq.systemname,
-         sq.abandoned,
-         sq.access,
-         sq.alt_name,
-         sq.bicycle,
-         sq.cnstrctn,
-         sq.est_width,
-         sq.fee,
-         sq.foot,
-         sq.highway,
-         sq.hwy_abndnd,
-         sq.horse,
-         sq.mtr_vhcle,
-         sq.mtb,
-         sq.name,
-         sq.operator,
-         sq.proposed,
-         sq.surface,
-         sq.wheelchair,
+  SELECT {{sq}}
          (ST_Dump(sq.geom)).geom AS geom
     FROM 
     (
-      SELECT diff.systemname,
-             diff.abandoned,
-             diff.access,
-             diff.alt_name,
-             diff.bicycle,
-             diff.cnstrctn,
-             diff.est_width,
-             diff.fee,
-             diff.foot,
-             diff.highway,
-             diff.hwy_abndnd,
-             diff.horse,
-             diff.mtr_vhcle,
-             diff.mtb,
-             diff.name,
-             diff.operator,
-             diff.proposed,
-             diff.surface,
-             diff.wheelchair,
+      SELECT {{diff}}
              ST_LineMerge(ST_Union(diff.geom)) AS geom
         FROM initial_diff AS diff
-        GROUP BY diff.systemname,
-                 diff.abandoned,
-                 diff.access,
-                 diff.alt_name,
-                 diff.bicycle,
-                 diff.cnstrctn,
-                 diff.est_width,
-                 diff.fee,
-                 diff.foot,
-                 diff.highway,
-                 diff.hwy_abndnd,
-                 diff.horse,
-                 diff.mtr_vhcle,
-                 diff.mtb,
-                 diff.name,
-                 diff.operator,
-                 diff.proposed,
-                 diff.surface,
-                 diff.wheelchair
+        GROUP BY {{diff_end}}
     ) AS sq
 );
 
