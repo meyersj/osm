@@ -15,8 +15,8 @@ REM ****************************************************************
 
 
 SET rlis_dir=G:\Rlis\
-SET osm_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Feb_2013\test\
-SET shape_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Feb_2013\test\
+SET osm_dir=..\test\rlis\
+SET shape_dir=..\test\rlis\
 SET util_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\utilities\
 
 
@@ -92,15 +92,15 @@ IF %type%==streets (
   call psql -U postgres -d %db% -f "%util_dir%rlis_streets2osm.sql"
   
   REM build rm_fpos.sql and generate_diff.sql using build_sql.py
-  call python ..\test\build_sql.py fpos ..\test\fpos_template.sql ..\sql\rm_fpos.sql %util_dir%rlis_streets_fields.txt
-  call python ..\test\build_sql.py dif ..\test\diff_template.sql ..\sql\generate_diff.sql %util_dir%rlis_streets_fields.txt
-  call python ..\test\build_sql.py split ..\sql\split_by_county.sql %util_dir%rlis_counties.txt rlis_streets
+  call python ..\sql\build_sql.py fpos ..\sql\fpos_template.sql ..\sql\rm_fpos.sql %util_dir%rlis_streets_fields.txt
+  call python ..\sql\build_sql.py diff ..\sql\diff_template.sql ..\sql\generate_diff.sql %util_dir%rlis_streets_fields.txt
+  call python ..\sql\build_sql.py split ..\sql\split_by_county.sql %util_dir%rlis_counties.txt rlis_streets
 
 
   call psql -U postgres -d %db% -f "../sql/rm_fpos.sql" -v fpos=fpos -v jurisd=osm_sts -v fpos_final=osm_sts_fpos_rm
 
   echo generating diff table
-  call psql -U postgres -d %db% -f "../sql/generate_diff.sql" -v osm=osm_filtered -v jurisd=osm_sts -v buf_size=urban_buf -v diff=rlis_streets_diff
+  call psql -U postgres -d %db% -f "../sql/generate_diff.sql" -v osm=osm_filtered -v jurisd=osm_sts_fpos_rm -v buf_size=urban_buf -v diff=rlis_streets_diff
 
   call psql -U postgres -d %db% -f "../sql/split_by_county.sql"
 

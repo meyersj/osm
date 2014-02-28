@@ -61,7 +61,7 @@ def build_split_sql(sql_out, counties_file, name):
     data = "BEGIN;\n{0}\nCOMMIT;"
     queries = ""
     create = """
-CREATE TABLE {{data}_diff_{{county}} AS
+CREATE TABLE {{data}}_diff_{{county}} AS
 (
   SELECT diff.*
   FROM {{data}}_diff AS diff
@@ -72,20 +72,10 @@ CREATE TABLE {{data}_diff_{{county}} AS
  
     with open(counties_file, 'r') as cf:
         counties = cf.read().splitlines()
-
     for county in counties:
-        print county
-        rendered = pystache.render(create, {'data':name, 'county':county})
-        queries = queries + rendered
-
-    data = data.format(queries)
-    #print data
+        queries = queries + pystache.render(create, {'data':name, 'county':county[0:4]})
     with open(sql_out, 'wb') as sql:
-        #data = data.replace('&qout;', '"')
-        sql.write(data)
-
-
-
+        sql.write(data.format(queries))
 
 if __name__ == '__main__':
     #counties = ['washington', 'multnomah', 'clackamas', 'yamhill']
@@ -104,7 +94,7 @@ if __name__ == '__main__':
     elif schema == 'fpos':
         result = build_fpos_sql(first, second, third)
     elif schema == 'split':
-        result = build_fpos_sql(first, second, third)
+        result = build_split_sql(first, second, third)
     
     if result:
         print "success"
