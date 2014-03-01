@@ -2,7 +2,7 @@
 --Contact: jeffrey dot alan dot meyers at gmail dot com
 --For: TriMet
 --Created on: November 2013
---Updated on: November 2013
+--Updated on: Jan 2014
 
 /*
 This sql template creates a diff table showing differences in geometry between osm and jurisdictional data.
