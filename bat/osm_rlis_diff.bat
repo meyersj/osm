@@ -15,8 +15,8 @@ REM ****************************************************************
 
 
 SET rlis_dir=G:\Rlis\
-SET osm_dir=..\test\rlis\
-SET shape_dir=..\test\rlis\
+SET osm_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Feb_2013\Streets\backup\osmfiles\
+SET shape_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Feb_2013\Streets\backup\shapefiles\
 SET util_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\utilities\
 
 
@@ -75,7 +75,7 @@ call psql -U postgres -d %db% -c "ALTER TABLE planet_osm_line RENAME TO osm_filt
 call psql -U postgres -d %db% -c "ALTER INDEX planet_osm_line_index RENAME TO osm_filtered_index"
 
 REM -import false positive osm file
-call osm2pgsql -U postgres -d %db% -S %util_dir%!style! "../test/rlis_fpos.osm"
+call osm2pgsql -U postgres -d %db% -S %util_dir%!style! %osm_dir%rlis_fpos.osm
 call psql -U postgres -d %db% -f "%util_dir%project.sql"
 call psql -U postgres -d %db% -c "ALTER TABLE planet_osm_line RENAME TO fpos"
 call psql -U postgres -d %db% -c "ALTER INDEX planet_osm_line_index RENAME TO fpos_index"
@@ -92,9 +92,12 @@ IF %type%==streets (
   call psql -U postgres -d %db% -f "%util_dir%rlis_streets2osm.sql"
   
   REM build rm_fpos.sql and generate_diff.sql using build_sql.py
-  call python ..\sql\build_sql.py fpos ..\sql\fpos_template.sql ..\sql\rm_fpos.sql %util_dir%rlis_streets_fields.txt
-  call python ..\sql\build_sql.py diff ..\sql\diff_template.sql ..\sql\generate_diff.sql %util_dir%rlis_streets_fields.txt
-  call python ..\sql\build_sql.py split ..\sql\split_by_county.sql %util_dir%rlis_counties.txt rlis_streets
+  
+  
+  
+  REM call python ..\sql\build_sql.py fpos ..\sql\fpos_template.sql ..\sql\rm_fpos.sql %util_dir%rlis_streets_fields.txt
+  REM call python ..\sql\build_sql.py diff ..\sql\diff_template.sql ..\sql\generate_diff.sql %util_dir%rlis_streets_fields.txt
+  REM call python ..\sql\build_sql.py split ..\sql\split_by_county.sql %util_dir%rlis_counties.txt rlis_streets
 
 
   call psql -U postgres -d %db% -f "../sql/rm_fpos.sql" -v fpos=fpos -v jurisd=osm_sts -v fpos_final=osm_sts_fpos_rm
