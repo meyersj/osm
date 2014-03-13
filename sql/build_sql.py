@@ -61,7 +61,7 @@ def build_split_sql(sql_out, counties_file, name):
     data = "BEGIN;\n{0}\nCOMMIT;"
     queries = ""
     create = """
-CREATE TABLE {{data}}_diff_{{county}} AS
+CREATE TABLE {{data}}_diff_{{county_short}} AS
 (
   SELECT diff.*
   FROM {{data}}_diff AS diff
@@ -70,43 +70,35 @@ CREATE TABLE {{data}}_diff_{{county}} AS
   WHERE co.county = '{{county}}'
 );\n"""
  
-    with open(counties_file, 'r') as cf:
-        counties = cf.read().splitlines()
-    for county in counties:
-        queries = queries + pystache.render(create, {'data':name, 'county':county[0:4]})
-    with open(sql_out, 'wb') as sql:
-        sql.write(data.format(queries))
+    try:
+        with open(counties_file, 'r') as cf:
+            counties = cf.read().splitlines()
+        for county in counties:
+            queries = queries + pystache.render(create, {'data':name, 'county_short':county[0:4].lower(), 'county':county})
+        with open(sql_out, 'wb') as sql:
+            sql.write(data.format(queries))
+    except:
+        return False
+    return True
 
 if __name__ == '__main__':
-    #counties = ['washington', 'multnomah', 'clackamas', 'yamhill']
+    result = None
+    try:
+        schema = sys.argv[1]
+        first = sys.argv[2]
+        second = sys.argv[3]
+        third = sys.argv[4]
 
-    #build_split_sql('create_test.sql','counties.txt','rlis_streets')
+        if schema == 'diff':
+            result = build_diff_sql(first, second, third)
+        elif schema == 'fpos':
+            result = build_fpos_sql(first, second, third)
+        elif schema == 'split':
+            result = build_split_sql(first, second, third)
+    except:
+        result = False
 
-    schema = sys.argv[1]
-    first = sys.argv[2]
-    second = sys.argv[3]
-    third = sys.argv[4]
-
-
-    result = None 
-    if schema == 'diff':
-        result = build_diff_sql(first, second, third)
-    elif schema == 'fpos':
-        result = build_fpos_sql(first, second, third)
-    elif schema == 'split':
-        result = build_split_sql(first, second, third)
-    
     if result:
         print "success"
     else:
         print "fail"
-
-    #test_in = 'generate_diff_template.sql'
-    #test_out = 'generate_diff.sql'
-    #attrs_file = 'G:/PUBLIC/OpenStreetMap/data/OSM_update/utilities/rlis_bike_fields.txt'
-    #attrs = ['oneway','direction','name','description','highway','access','service','surface','pc_left','pc_right']
-    
-    #if build_sql(template, output, fields):
-    #    print 'success'
-    #else:
-    #    print 'fail'

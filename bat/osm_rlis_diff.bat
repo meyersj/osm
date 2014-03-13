@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 REM -Usage: spatial_db my_database_name
 
 REM choose default database name instead of taking name as parameter
-SET db=foo_base
+SET db=foo_base2
 
 REM take streets or trails keyword as parameter to affect how osmosis filters
 SET type=%1
@@ -15,8 +15,8 @@ REM ****************************************************************
 
 
 SET rlis_dir=G:\Rlis\
-SET osm_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Feb_2013\Streets\backup\osmfiles\
-SET shape_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Feb_2013\Streets\backup\shapefiles\
+SET osm_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Feb_2013\Streets\backup\test\
+SET shape_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\Feb_2013\Streets\backup\test\
 SET util_dir=G:\PUBLIC\OpenStreetMap\data\OSM_update\utilities\
 
 
@@ -74,9 +74,6 @@ call psql -U postgres -d %db% -f "%util_dir%project.sql"
 call psql -U postgres -d %db% -c "ALTER TABLE planet_osm_line RENAME TO osm_filtered"
 call psql -U postgres -d %db% -c "ALTER INDEX planet_osm_line_index RENAME TO osm_filtered_index"
 
-
-
-
 call shp2pgsql -I -s 2913 %util_dir%oregon_urban_buffers.shp urban_buf | psql -U postgres -d %db% 
 call shp2pgsql -I -s 2913 -W LATIN1 %rlis_dir%BOUNDARY\co_fill.shp co_fill | psql -U postgres -d %db% 
 
@@ -96,9 +93,9 @@ IF %type%==streets (
 
 
   REM build rm_fpos.sql and generate_diff.sql using build_sql.py
-  REM call python ..\sql\build_sql.py fpos ..\sql\fpos_template.sql ..\sql\rm_fpos.sql %util_dir%rlis_streets_fields.txt
-  REM call python ..\sql\build_sql.py diff ..\sql\diff_template.sql ..\sql\generate_diff.sql %util_dir%rlis_streets_fields.txt
-  REM call python ..\sql\build_sql.py split ..\sql\split_by_county.sql %util_dir%rlis_counties.txt rlis_streets
+  call python ..\sql\build_sql.py fpos ..\sql\fpos_template.sql ..\sql\rm_fpos.sql %util_dir%rlis_streets_fields.txt
+  call python ..\sql\build_sql.py diff ..\sql\diff_template.sql ..\sql\generate_diff.sql %util_dir%rlis_streets_fields.txt
+  call python ..\sql\build_sql.py split ..\sql\split_by_county.sql %util_dir%rlis_counties.txt rlis_streets
 
 
   call psql -U postgres -d %db% -f "../sql/rm_fpos.sql" -v fpos=fpos -v jurisd=osm_sts -v fpos_final=osm_sts_fpos_rm
@@ -128,12 +125,10 @@ IF %type%==trails (
   echo uploading rlis trails into database
   call shp2pgsql -I -s 2913 %rlis_dir%\TRANSIT\trails.shp rlis_trails | psql -U postgres -d %db% 
   call psql -U postgres -d %db% -f "%util_dir%rlis_trails2osm.sql"
-
   
   call psql -U postgres -d %db% -f "generate_diff_rlis_trails.sql" -v osm=planet_osm_line -v jurisd=osm_trails -v buf_size=urban_buf -v diff=rlis_trails_diff -f "../sql/generate_diff_rlis_trails.sql"
   
   call psql -U postgres -d %db% -f "../sql/split_county_rlis_trails.sql"
-
 
   REM export generated diff
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_trails_diff.shp %db% rlis_trails_diff
