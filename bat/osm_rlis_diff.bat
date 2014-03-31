@@ -99,24 +99,14 @@ IF %type%==streets (
   call shp2pgsql -I -s 2913 %rlis_dir%STREETS\streets.shp rlis_streets | psql -U postgres -d %db% 
   call psql -U postgres -d %db% -f "%util_dir%rlis_streets2osm.sql"
 
-  REM -import false positive osm file
-  REM call osm2pgsql -U postgres -d %db% -S %util_dir%!style! %osm_dir%rlis_fpos.osm
-  REM call psql -U postgres -d %db% -f "%util_dir%project.sql"
-  REM call psql -U postgres -d %db% -c "ALTER TABLE planet_osm_line RENAME TO fpos"
-  REM call psql -U postgres -d %db% -c "ALTER INDEX planet_osm_line_index RENAME TO fpos_index"
-
-
-  REM build rm_fpos.sql and generate_diff.sql using build_sql.py
-  call python ..\sql\build_sql.py fpos ..\sql\fpos_template.sql ..\sql\rm_fpos.sql %util_dir%rlis_streets_fields.txt
-  call python ..\sql\build_sql.py diff ..\sql\diff_template.sql ..\sql\generate_diff.sql %util_dir%rlis_streets_fields.txt
-  call python ..\sql\build_sql.py split ..\sql\split_by_county.sql %util_dir%rlis_counties.txt rlis_streets
-
-
   call psql -U postgres -d %db% -f "../sql/rm_fpos.sql" -v fpos=fpos -v jurisd=osm_sts -v fpos_final=osm_sts_fpos_rm
   echo generating diff table
   call psql -U postgres -d %db% -f "../sql/generate_diff.sql" -v osm=osm_filtered -v jurisd=osm_sts_fpos_rm -v buf_size=urban_buf -v diff=rlis_streets_diff
   call psql -U postgres -d %db% -f "../sql/split_by_county.sql"
 
+
+  REM TODO refactor trails and streets export as one code with variable
+  
   REM export generated diff
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff.shp %db% rlis_streets_diff
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_streets_diff_wash.shp %db% rlis_streets_diff_wash
@@ -138,8 +128,6 @@ IF %type%==trails (
   REM -import RLIS file and run sql conversion script
   echo uploading rlis trails into database
   
-  
-  
   call shp2pgsql -I -s 2913 %rlis_dir%\TRANSIT\trails.shp rlis_trails | psql -U postgres -d %db% 
   call psql -U postgres -d %db% -f "%util_dir%rlis_trails2osm.sql"
   
@@ -149,18 +137,14 @@ IF %type%==trails (
   call psql -U postgres -d %db% -f "../sql/split_by_county.sql"
 
 
-
-  REM call psql -U postgres -d %db% -f "generate_diff_rlis_trails.sql" -v osm=planet_osm_line -v jurisd=osm_trails -v buf_size=urban_buf -v diff=rlis_trails_diff -f "../sql/generate_diff_rlis_trails.sql"
+  REM TODO refactor trails and streets export as one code with variable
   
-  REM call psql -U postgres -d %db% -f "../sql/split_county_rlis_trails.sql"
-
   REM export generated diff
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_trails_diff.shp %db% rlis_trails_diff
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_trails_diff_wash.shp %db% rlis_trails_diff_wash
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_trails_diff_clack.shp %db% rlis_trails_diff_clac
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_trails_diff_mult.shp %db% rlis_trails_diff_mult
   call pgsql2shp -k -u postgres -P password -f  %shape_dir%rlis_trails_diff_yam.shp %db% rlis_trails_diff_yamh
-
 
   REM ogr2osm.py script to export shapefile diff to osm file
   call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%rlis_trails_diff.shp -o %osm_dir%rlis_trails_diff.osm -t %util_dir%ogr2osm\translations\rlis_trails.py
@@ -170,5 +154,5 @@ IF %type%==trails (
   call python %util_dir%ogr2osm\ogr2osm.py %shape_dir%rlis_trails_diff_yam.shp -o %osm_dir%rlis_trails_diff_yam.osm -t %util_dir%ogr2osm\translations\rlis_trails.py
 )
 
-REM call psql -U postgres -c "DROP DATABASE %db%;"
+call psql -U postgres -c "DROP DATABASE %db%;"
 
